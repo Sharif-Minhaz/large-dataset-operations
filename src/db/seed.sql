@@ -1,63 +1,110 @@
+-- Move CSV files (data/*) to MySQL allowed directory (/var/lib/mysql-files/)
+
 -- ============================================
--- Seed data — 5 products with related records
--- Run: mysql -u root -p products_db < src/db/seed.sql
+-- 🚀 HIGH-PERFORMANCE BULK SEED SCRIPT
+-- For 20M+ rows (InnoDB optimized)
 -- ============================================
 
-USE products_db;
+-- --------------------------------------------
+-- 0. SAFETY (disable constraints for speed)
+-- --------------------------------------------
+SET foreign_key_checks = 0;
+SET unique_checks = 0;
 
--- ----------------------------
--- Categories
--- ----------------------------
-INSERT INTO category (id, name, image_url) VALUES
-  (1, 'Electronics',    'https://img.example.com/cat/electronics.jpg'),
-  (2, 'Clothing',       'https://img.example.com/cat/clothing.jpg'),
-  (3, 'Home & Kitchen', 'https://img.example.com/cat/home.jpg');
+-- --------------------------------------------
+-- 1. LOAD SMALL TABLES FIRST
+-- --------------------------------------------
 
--- ----------------------------
--- Brands
--- ----------------------------
-INSERT INTO brand (id, name, image_url) VALUES
-  (1, 'Sony',    'https://img.example.com/brand/sony.jpg'),
-  (2, 'Nike',    'https://img.example.com/brand/nike.jpg'),
-  (3, 'Samsung', 'https://img.example.com/brand/samsung.jpg'),
-  (4, 'IKEA',    'https://img.example.com/brand/ikea.jpg');
+LOAD DATA INFILE '/var/lib/mysql-files/category.csv'
+INTO TABLE category
+FIELDS TERMINATED BY ','
+ENCLOSED BY '"'
+LINES TERMINATED BY '\n'
+IGNORE 1 ROWS
+(id, name);
 
--- ----------------------------
--- Products
--- ----------------------------
-INSERT INTO products (id, name, description, category_id, brand_id, purchase_price, sales_price, created) VALUES
-  (1, 'Sony WH-1000XM5',       'Wireless noise-cancelling headphones with 30hr battery life',       1, 1, 250.00, 349.99, '2025-11-10 08:30:00'),
-  (2, 'Nike Air Max 270',       'Lightweight running shoes with Max Air unit for all-day comfort',   2, 2, 85.00,  149.99, '2025-12-01 10:00:00'),
-  (3, 'Samsung Galaxy S24',     '6.2 inch AMOLED display, 128GB storage, 50MP camera',              1, 3, 520.00, 799.99, '2026-01-15 09:00:00'),
-  (4, 'IKEA KALLAX Shelf',      'Modular 4x4 shelf unit, white finish, fits standard storage boxes', 3, 4, 45.00,  79.99,  '2026-02-20 14:00:00'),
-  (5, 'Sony WF-1000XM5',       'True wireless earbuds with adaptive noise cancelling',               1, 1, 180.00, 279.99, '2026-03-05 11:30:00');
+LOAD DATA INFILE '/var/lib/mysql-files/brand.csv'
+INTO TABLE brand
+FIELDS TERMINATED BY ','
+ENCLOSED BY '"'
+LINES TERMINATED BY '\n'
+IGNORE 1 ROWS
+(id, name);
 
--- ----------------------------
--- Images (multiple per product)
--- ----------------------------
-INSERT INTO images (url, product_id) VALUES
-  ('https://img.example.com/products/xm5-front.jpg',    1),
-  ('https://img.example.com/products/xm5-side.jpg',     1),
-  ('https://img.example.com/products/xm5-case.jpg',     1),
-  ('https://img.example.com/products/airmax-white.jpg',  2),
-  ('https://img.example.com/products/airmax-black.jpg',  2),
-  ('https://img.example.com/products/s24-front.jpg',     3),
-  ('https://img.example.com/products/s24-back.jpg',      3),
-  ('https://img.example.com/products/s24-box.jpg',       3),
-  ('https://img.example.com/products/kallax-front.jpg',  4),
-  ('https://img.example.com/products/wf-xm5-buds.jpg',  5),
-  ('https://img.example.com/products/wf-xm5-case.jpg',  5);
+-- --------------------------------------------
+-- 2. DROP HEAVY INDEXES (IMPORTANT)
+-- --------------------------------------------
 
--- ----------------------------
--- Stock (multiple batches per product)
--- ----------------------------
-INSERT INTO stock (batch_id, quantity, name, product_id) VALUES
-  ('BATCH-2025-001', 120, 'Initial stock',        1),
-  ('BATCH-2025-002',  45, 'Restock Jan',           1),
-  ('BATCH-2025-003', 200, 'Launch batch',          2),
-  ('BATCH-2025-004',  80, 'Feb restock',           2),
-  ('BATCH-2026-001', 300, 'Launch shipment',       3),
-  ('BATCH-2026-002',  50, 'Warehouse transfer',    4),
-  ('BATCH-2026-003',  25, 'Showroom allocation',   4),
-  ('BATCH-2026-004', 150, 'Pre-order batch',       5),
-  ('BATCH-2026-005',  60, 'Retail restock',        5);
+-- Products indexes
+ALTER TABLE products DROP INDEX idx_products_category;
+ALTER TABLE products DROP INDEX idx_products_brand;
+ALTER TABLE products DROP INDEX idx_products_created;
+ALTER TABLE products DROP INDEX idx_products_deleted;
+ALTER TABLE products DROP INDEX idx_products_active_id;
+
+-- Fulltext index
+ALTER TABLE products DROP INDEX ft_products_name_desc;
+
+-- Child table indexes
+ALTER TABLE stock DROP INDEX idx_stock_product;
+ALTER TABLE images DROP INDEX idx_images_product;
+
+-- --------------------------------------------
+-- 3. LOAD LARGE TABLES
+-- --------------------------------------------
+
+-- PRODUCTS (main heavy load)
+LOAD DATA INFILE '/var/lib/mysql-files/products.csv'
+INTO TABLE products
+FIELDS TERMINATED BY ','
+ENCLOSED BY '"'
+LINES TERMINATED BY '\n'
+(id, name, description, category_id, brand_id, created, purchase_price, sales_price, @deleted_at)
+SET deleted_at = NULLIF(@deleted_at, '');
+
+-- IMAGES
+LOAD DATA INFILE '/var/lib/mysql-files/images.csv'
+INTO TABLE images
+FIELDS TERMINATED BY ','
+ENCLOSED BY '"'
+LINES TERMINATED BY '\n'
+(id, url, product_id);
+
+-- STOCK
+LOAD DATA INFILE '/var/lib/mysql-files/stock.csv'
+INTO TABLE stock
+FIELDS TERMINATED BY ','
+ENCLOSED BY '"'
+LINES TERMINATED BY '\n'
+(id, batch_id, quantity, name, product_id);
+
+-- --------------------------------------------
+-- 4. REBUILD INDEXES (FAST BULK BUILD)
+-- --------------------------------------------
+
+-- Products indexes
+CREATE INDEX idx_products_category  ON products(category_id);
+CREATE INDEX idx_products_brand     ON products(brand_id);
+CREATE INDEX idx_products_created   ON products(created);
+CREATE INDEX idx_products_deleted   ON products(deleted_at);
+CREATE INDEX idx_products_active_id ON products(deleted_at, id);
+
+-- Fulltext index (heavy, keep last)
+ALTER TABLE products ADD FULLTEXT ft_products_name_desc (name, description);
+
+-- Child indexes
+CREATE INDEX idx_stock_product   ON stock(product_id);
+CREATE INDEX idx_images_product  ON images(product_id);
+
+-- --------------------------------------------
+-- 5. RESTORE SETTINGS
+-- --------------------------------------------
+SET foreign_key_checks = 1;
+SET unique_checks = 1;
+
+-- ============================================
+-- ✅ DONE
+-- ============================================
+
+-- SHOW PROCESSLIST;
+-- SHOW GLOBAL STATUS LIKE 'Innodb_rows_inserted';

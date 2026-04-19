@@ -61,7 +61,8 @@ export async function getProductById(id) {
 
 // ─── Fulltext search ────────────────────────────────────────────
 
-export async function searchProducts(term, limit) {
+export async function searchProducts(term, limit, page = 1) {
+  const offset = (page - 1) * limit;
   const sql = `
     SELECT
       p.id,
@@ -73,11 +74,11 @@ export async function searchProducts(term, limit) {
     ${FROM_PRODUCTS}
     WHERE ${NOT_DELETED}
       AND MATCH(p.name, p.description) AGAINST (? IN NATURAL LANGUAGE MODE)
-    ORDER BY relevance DESC
-    LIMIT ?
+    ORDER BY relevance DESC, p.id ASC
+    LIMIT ? OFFSET ?
   `;
 
-  const [rows] = await pool.query(sql, [term, term, limit]);
+  const [rows] = await pool.query(sql, [term, term, limit, offset]);
   return rows;
 }
 

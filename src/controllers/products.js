@@ -9,7 +9,10 @@ export async function list(_req, res, next) {
 
     const cacheKey = `products:list:${lastId ?? "start"}:${limit}`;
     const cached = await cacheGet(cacheKey);
-    if (cached) return res.json(cached);
+    if (cached) {
+      console.info(`[cache] HIT ${cacheKey}`);
+      return res.json(cached);
+    }
 
     const rows = await productService.getProducts(lastId, limit);
 
@@ -37,7 +40,10 @@ export async function getById(_req, res, next) {
 
     const cacheKey = `products:detail:${id}`;
     const cached = await cacheGet(cacheKey);
-    if (cached) return res.json(cached);
+    if (cached) {
+      console.info(`[cache] HIT ${cacheKey}`);
+      return res.json(cached);
+    }
 
     const product = await productService.getProductById(id);
     if (!product) {
@@ -56,13 +62,18 @@ export async function getById(_req, res, next) {
 
 export async function search(_req, res, next) {
   try {
-    const { term, limit } = res.locals.validated;
-    const rows = await productService.searchProducts(term, limit);
+    const { term, limit, page } = res.locals.validated;
+    const rows = await productService.searchProducts(term, limit, page);
 
     res.json({
       success: true,
       data: rows,
       count: rows.length,
+      pagination: {
+        page,
+        limit,
+        nextPage: rows.length === limit ? page + 1 : null,
+      },
     });
   } catch (err) {
     next(err);

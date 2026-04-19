@@ -68,7 +68,17 @@ export function validateSearch(req, res, next) {
 		parsedLimit = n;
 	}
 
-	res.locals.validated = { term: term.trim(), limit: parsedLimit };
+	let parsedPage = 1;
+	const page = req.query.page;
+	if (page !== undefined) {
+		const n = Number(page);
+		if (!Number.isInteger(n) || n < 1) {
+			return next(createError(400, "page must be a positive integer"));
+		}
+		parsedPage = n;
+	}
+
+	res.locals.validated = { term: term.trim(), limit: parsedLimit, page: parsedPage };
 	next();
 }
 

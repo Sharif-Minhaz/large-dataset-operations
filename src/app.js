@@ -14,19 +14,19 @@ app.use(limiter);
 
 // ─── Request logging ────────────────────────────────────────────
 app.use((req, _res, next) => {
-  const start = Date.now();
-  const originalEnd = _res.end;
-  _res.end = function (...args) {
-    const duration = Date.now() - start;
-    console.log(`[${req.method}] ${req.originalUrl} → ${_res.statusCode} (${duration}ms)`);
-    originalEnd.apply(this, args);
-  };
-  next();
+	const start = Date.now();
+	const originalEnd = _res.end;
+	_res.end = function (...args) {
+		const duration = Date.now() - start;
+		console.log(`[${req.method}] ${req.originalUrl} → ${_res.statusCode} (${duration}ms)`);
+		originalEnd.apply(this, args);
+	};
+	next();
 });
 
 // ─── Health check ───────────────────────────────────────────────
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok" });
+	res.status(200).json({ status: "ok" });
 });
 
 // ─── Routes ─────────────────────────────────────────────────────

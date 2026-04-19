@@ -7,6 +7,7 @@
 		"test": "echo \"Error: no test specified\" && exit 1",
 		"start": "node --env-file=.env src/server.js",
 		"dev": "node --watch --env-file=.env src/server.js",
+		"gen": "node scripts/runAll.js",
 		"db:setup": "mysql -u root -p < src/db/schema.sql",
 		"db:seed": "mysql -u root -p products_db < src/db/seed.sql"
 	},
@@ -15,6 +16,7 @@
 	"license": "ISC",
 	"type": "module",
 	"dependencies": {
+		"@faker-js/faker": "^10.4.0",
 		"cors": "^2.8.6",
 		"express": "^5.2.1",
 		"express-rate-limit": "^8.3.2",
