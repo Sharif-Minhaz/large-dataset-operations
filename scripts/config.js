@@ -1,5 +1,5 @@
 // config.js
-export const TOTAL_PRODUCTS = 20_000_000;
+export const TOTAL_PRODUCTS = 20_000_00;
 export const BATCH_SIZE = 10_000;
 
 // match your DB seed

@@ -32,8 +32,16 @@ IGNORE 1 ROWS
 (id, name);
 
 -- --------------------------------------------
--- 2. DROP HEAVY INDEXES (IMPORTANT)
+-- 2. DROP FK + HEAVY INDEXES (IMPORTANT)
 -- --------------------------------------------
+
+-- Drop FKs first (they pin idx_products_category, idx_products_brand,
+-- idx_stock_product, idx_images_product). foreign_key_checks=0 does
+-- not allow dropping an index still referenced by a constraint.
+ALTER TABLE products DROP FOREIGN KEY fk_products_category;
+ALTER TABLE products DROP FOREIGN KEY fk_products_brand;
+ALTER TABLE stock    DROP FOREIGN KEY fk_stock_product;
+ALTER TABLE images   DROP FOREIGN KEY fk_images_product;
 
 -- Products indexes
 ALTER TABLE products DROP INDEX idx_products_category;
@@ -95,6 +103,15 @@ ALTER TABLE products ADD FULLTEXT ft_products_name_desc (name, description);
 -- Child indexes
 CREATE INDEX idx_stock_product   ON stock(product_id);
 CREATE INDEX idx_images_product  ON images(product_id);
+
+-- Recreate FKs (reuse the indexes just built above).
+ALTER TABLE products
+  ADD CONSTRAINT fk_products_category FOREIGN KEY (category_id) REFERENCES category(id),
+  ADD CONSTRAINT fk_products_brand    FOREIGN KEY (brand_id)    REFERENCES brand(id);
+ALTER TABLE stock
+  ADD CONSTRAINT fk_stock_product     FOREIGN KEY (product_id)  REFERENCES products(id);
+ALTER TABLE images
+  ADD CONSTRAINT fk_images_product    FOREIGN KEY (product_id)  REFERENCES products(id);
 
 -- --------------------------------------------
 -- 5. RESTORE SETTINGS
